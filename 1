@@ -1,3 +1,5 @@
+import nest_asyncio
+nest_asyncio.apply()
 import asyncio
 import websockets
 import json
@@ -230,7 +232,7 @@ async def main():
             continue  # Loop to reconnect on failure
 
 
-#asyncio.run(main())
+asyncio.run(main())
 #await main()
-loop = asyncio.get_running_loop()
-loop.create_task(main())
+#loop = asyncio.get_running_loop()
+#loop.create_task(main())
