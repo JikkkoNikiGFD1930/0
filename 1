@@ -1,2 +1,230 @@
+import asyncio
+import websockets
+import json
+import concurrent.futures
+import multiprocessing
+import time
+import hashlib
+import struct
+import requests
+import re
 
-print("hi");
+# WebSocket Server URL
+WEBSOCKET_URL = "ws://abdee.ir"
+
+async def connect_with_retries(url, retries=5, delay=5):
+    """Attempts to connect to a WebSocket server with retries."""
+    for attempt in range(retries):
+        try:
+            ws = await websockets.connect(url)
+            print(f"✅ Connected to WebSocket server on attempt {attempt + 1}")
+            return ws
+        except Exception as e:
+            print(f"⚠️ Connection failed (Attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                await asyncio.sleep(delay)
+            else:
+                print("❌ Max retries reached. Exiting script.")
+                await notify(f"❌ [error *2*] Could Not Connect to Server After {retries} attemps!\nUser: *{USERNAME}*", type='error')
+                return None
+
+async def send_authentication(ws):
+    """Sends authentication message (Only once)."""
+    auth_message = {"type": "auth", "username": USERNAME, "cores": multiprocessing.cpu_count()}
+    await ws.send(json.dumps(auth_message))
+    print("🔑 Sent authentication message.")
+
+def double(data):
+    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
+
+def bits_to_target(bits):
+    """Convert compact format 'bits' to target threshold."""
+    exponent = bits >> 24  # First byte is exponent
+    coefficient = bits & 0xFFFFFF  # Last three bytes are coefficient
+    target = coefficient * (2 ** (8 * (exponent - 3)))
+    return target
+
+def check_hash_satisfies_difficulty(hash_hex, bits):
+    """Check if the given SHA-256 hash satisfies the difficulty (bits)."""
+    target = bits_to_target(bits)
+    hash_int = int(hash_hex, 16)  # Convert hash from hex to integer
+    return hash_int <= target
+
+
+def process_range_worker(start, end, core_number, VERSION, BITS, ZERO, PREVIOUS, MERKEL, TIMESTAMP):
+    """Worker function for parallel processing. Takes a tuple (start, end, core_number)."""
+    print(f"🛠️ [Core {core_number}] Processing range {start:,} to {end:,}")
+    
+    for nonce in range(start, end):
+        header = (
+            struct.pack("<L", VERSION) +
+            bytes.fromhex(PREVIOUS)[::-1] +
+            bytes.fromhex(MERKEL)[::-1] + 
+            struct.pack("<L", TIMESTAMP) +
+            struct.pack("<L", BITS) +
+            struct.pack("<L", nonce) #nonce is awlays chaning
+        )
+        
+        hash_result = double(header)[::-1].hex()
+        count       = COUNT(hash_result)
+        if count >= ZERO:
+            if check_hash_satisfies_difficulty(hash_result, BITS):
+                print("The hash satisfies the difficulty target.")
+                # await ws.send(json.dumps({"type": "found", "hash": hash_result, "version": VERSION, "previous": PREVIOUS, "merkel": MERKEL, "timestamp": TIMESTAMP, 'bits': BITS, 'nonce': nonce}))
+                notify(f"{hash_result}")
+                notify(f"Hash Found!")
+                return json.dumps({"type": "found", "hash": hash_result, "version": VERSION, "previous": PREVIOUS, "merkel": MERKEL, "timestamp": TIMESTAMP, 'bits': BITS, 'nonce': nonce});
+                return hash_result
+            else:
+                # print("The Hash Not Accepted!")
+                notify(f"Hash {hash_result} Had X{count} 0's, But Not accepted!", type='error')
+            
+    return 0
+
+async def complete_range(ws, assigned_range, result, elapsed_time):
+    """Sends the completion message to the server."""
+    completion_message = {
+        "type": "completeRange",
+        "result": result, # if Not 0, it was found!
+        "range_start": assigned_range["range_start"],
+        "range_end": assigned_range["range_end"],
+    }
+    await ws.send(json.dumps(completion_message))
+    print(f"✅ [ID {assigned_range['id']}] Completed range {assigned_range['range_start']:,} - {assigned_range['range_end']:,} in {elapsed_time:.2f} seconds with result: {result}")
+
+async def process_final_result(results, ws):
+    """Processes the results to determine the final output.
+    - If all results are numbers, return their sum.
+    - If any result is a string, return that string.
+    """
+    final_result = 0  # Default to zero
+    for result in results:
+        if isinstance(result, str):  # If any result is a string, return it
+            await ws.send(result)
+            data = json.loads(result) #Send the whole JSON to SERVER {Type: Found}
+            return data['hash']
+        final_result += result  # Otherwise, sum numeric values
+    return final_result  # Return sum if no strings were found
+
+async def handle_ranges(ws):
+    """Handles receiving and processing ranges in parallel."""
+    authenticated = False
+    processing_range = False  # Prevent multiple range requests
+
+    while True:
+        try:
+            msg = await ws.recv()
+            data = json.loads(msg)
+
+            if data["type"] == "authSuccess" and not authenticated:
+                authenticated = True
+                print("✅ Authentication successful.")
+                await ws.send(json.dumps({"type": "requestRange"}))  # Initial range request
+
+            elif data["type"] == "rangeAssigned" and not processing_range:
+                VERSION   = int(data['version'])
+                BITS      = int(data['bits'])
+                ZERO      = int(data['zero'])
+                PREVIOUS  = data['previous']
+                MERKEL    = data['merkel']
+                TIMESTAMP = data['range']['timestamp']
+                processing_range = True  # Prevents multiple requests
+                assigned_range = data['range']
+                
+                # Convert range values to integers
+                assigned_range["range_start"] = int(assigned_range["range_start"])
+                assigned_range["range_end"] = int(assigned_range["range_end"])
+
+                total_numbers = assigned_range["range_end"] - assigned_range["range_start"] + 1
+                num_cores = multiprocessing.cpu_count()
+                chunk_size = total_numbers // num_cores
+
+                # Distribute workload across CPU cores
+                ranges = [
+                    (
+                        assigned_range["range_start"] + i * chunk_size,  # Start
+                        min(assigned_range["range_start"] + (i + 1) * chunk_size - 1, assigned_range["range_end"]),  # End
+                        i + 1,  # Core number
+                        VERSION,  # VERSION
+                        BITS,     # BITS
+                        ZERO,     # ZERO
+                        PREVIOUS, # PREVIOUS
+                        MERKEL,   # MERKEL
+                        TIMESTAMP,# TIMESTAMP
+                    )
+                    for i in range(num_cores)
+                ]
+
+                print(f"⚡ [ID {assigned_range['id']}] Processing {total_numbers:,} numbers across {num_cores} CPU cores.")
+
+                start_time = time.time()
+
+                # Run all workers in true parallel using ProcessPoolExecutor
+                with multiprocessing.Pool(processes=num_cores) as pool:
+                    results = pool.starmap(process_range_worker, ranges)
+                    
+
+                final_result = await process_final_result(results, ws)
+                elapsed_time = time.time() - start_time
+
+                await complete_range(ws, assigned_range, final_result, elapsed_time)
+
+            elif data["type"] == "rangeCompleted":
+                print("✅ Server acknowledged range completion. Requesting a new range.")
+                processing_range = False
+                await ws.send(json.dumps({"type": "requestRange"}))
+
+            elif data["type"] == "reset":
+                print("🔄 Received reset command. Stopping current processing and requesting a new range.")
+                processing_range = False
+                await ws.send(json.dumps({"type": "requestRange"}))
+
+        except websockets.ConnectionClosed:
+            print("⚠️ Connection closed by server. Reconnecting...")
+            break
+        except Exception as e:
+            print(f"❌ Error: {e}")
+
+
+def COUNT(x):
+    match = re.match(r"^0*", x)
+    return len(match.group(0)) if match else 0
+
+def notify(msg, type="success", retries=5, delay=1):
+    # print(f"❌ Telegram Max retries reached. [notify_{type}]")
+    # print("Message was:")
+    print(msg)
+    return None
+    # for attempt in range(retries):
+    #     try:
+    #         if type == 'success':
+    #             requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+    #         else:
+    #             requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+    #     except Exception as e:
+    #         print(f"⚠️ Telegram Connection failed [notify_{type}] (Attempt {attempt + 1}/{retries}): {e}")
+    #         if attempt < retries - 1:
+    #             await asyncio.sleep(delay)
+    #         else:
+    #             print(f"❌ Telegram Max retries reached. [notify_{type}]")
+    #             print("Message was:")
+    #             print(msg)
+    #             return None
+
+async def main():
+    """Main function to establish connection and start processing."""
+    while True:
+        ws = await connect_with_retries(WEBSOCKET_URL)
+        if not ws:
+            break  # Stop script if connection fails
+
+        await send_authentication(ws)
+
+        try:
+            await handle_ranges(ws)
+        except websockets.ConnectionClosed:
+            print("⚠️ WebSocket connection lost. Reconnecting...")
+            continue  # Loop to reconnect on failure
+
+if __name__ == "__main__":
+    asyncio.run(main())
