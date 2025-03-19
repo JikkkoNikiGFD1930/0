@@ -12,6 +12,8 @@ import re
 # WebSocket Server URL
 WEBSOCKET_URL = "ws://abdee.ir"
 
+print("hi ...?X?X?X");
+
 async def connect_with_retries(url, retries=5, delay=5):
     """Attempts to connect to a WebSocket server with retries."""
     for attempt in range(retries):
@@ -212,6 +214,7 @@ def notify(msg, type="success", retries=5, delay=1):
     #             return None
 
 async def main():
+    print("main says HELLLLLLLLLLLLLo");
     """Main function to establish connection and start processing."""
     while True:
         ws = await connect_with_retries(WEBSOCKET_URL)
