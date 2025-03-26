@@ -56,8 +56,8 @@ def process_range_worker(start, end, core_number, VERSION, BITS, ZERO, PREVIOUS,
     """Worker function for parallel processing. Takes a tuple (start, end, core_number)."""
     print(f"🛠️ [Core {core_number}] Processing range {start:,} to {end:,}")
     
-    start = start // 10
-    end   = end // 10
+    start = start // 1
+    end   = end // 1
     
     for nonce in range(start, end):
         header = (
