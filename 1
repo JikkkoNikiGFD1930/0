@@ -54,7 +54,7 @@ def check_hash_satisfies_difficulty(hash_hex, bits):
 
 def process_range_worker(start, end, core_number, VERSION, BITS, ZERO, PREVIOUS, MERKEL, TIMESTAMP, BLOCKNO):
     """Worker function for parallel processing. Takes a tuple (start, end, core_number)."""
-    print(f"🛠️ [Core {core_number}] Processing range {start:,} to {end:,}")
+    #print(f"🛠️ [Core {core_number}] Processing range {start:,} to {end:,}")
     
     start = start // 1
     end   = end // 1
@@ -163,18 +163,18 @@ async def handle_ranges():
                 final_result = await process_final_result(results)
                 elapsed_time = time.time() - start_time
                 
-                print("⚡ ⚡ Final Result :")
-                print("")
-                print("")
-                print(final_result)
-                print("")
-                print("")
+                #print("⚡ ⚡ Final Result :")
+                #print("")
+                #print("")
+                #print(final_result)
+                #print("")
+                #print("")
                 
                 response = send({"type": "completeRange", "result": final_result, "range_start": assigned_range["range_start"], "range_end": assigned_range["range_end"], "elapsed_time": elapsed_time})
                 
                 print(f"✅ [ID {assigned_range['id']}] Completed range {assigned_range['range_start']:,} - {assigned_range['range_end']:,} in {elapsed_time:.2f} seconds with result: {final_result}")
                 
-                print("Server Reponse: ", response)
+                #print("Server Reponse: ", response)
                 processing_range = False
         except Exception as e:
             print(f"❌ Error: {e}")
@@ -212,7 +212,7 @@ def update_the_latest(timeout=5, interval=10):
             if response.status_code == 200:
                 LATEST = response.text
                 if True:
-                    print("🟢 LATEST updated: ", LATEST)
+                    #print("🟢 LATEST updated: ", LATEST)
             else:
                 print(f"🔴 Failed to fetch data. Status code: {response.status_code} /// {response}")
         except requests.RequestException as e:
