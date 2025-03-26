@@ -211,7 +211,7 @@ def update_the_latest(timeout=5, interval=10):
             response = requests.get(f"{HTTP_SERVER_URL}/?type=last", timeout=timeout)
             if response.status_code == 200:
                 LATEST = response.text
-                if True:
+                #if True:
                     #print("🟢 LATEST updated: ", LATEST)
             else:
                 print(f"🔴 Failed to fetch data. Status code: {response.status_code} /// {response}")
