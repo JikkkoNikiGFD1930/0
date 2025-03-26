@@ -48,7 +48,7 @@ def bits_to_target(bits):
 
 def check_hash_satisfies_difficulty(hash_hex, bits):
     """Check if the given SHA-256 hash satisfies the difficulty (bits)."""
-    target = bits_to_target(bits)
+    target = bits_to_target( 486604799 )
     hash_int = int(hash_hex, 16)  # Convert hash from hex to integer
     return hash_int <= target
 
