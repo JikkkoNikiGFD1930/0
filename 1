@@ -71,7 +71,7 @@ def process_range_worker(start, end, core_number, VERSION, BITS, ZERO, PREVIOUS,
         
         hash_result = double(header)[::-1].hex()
         count       = COUNT(hash_result)
-        if count >= (ZERO + 1):
+        if count >= (ZERO - 1):
             if check_hash_satisfies_difficulty(hash_result, BITS):
                 print("✅ ✅ The hash satisfies the difficulty target. ✅ ✅")
                 # await ws.send(json.dumps({"type": "found", "hash": hash_result, "version": VERSION, "previous": PREVIOUS, "merkel": MERKEL, "timestamp": TIMESTAMP, 'bits': BITS, 'nonce': nonce}))
