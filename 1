@@ -210,7 +210,7 @@ def update_the_latest(timeout=5, interval=10):
     global LATEST
     while True:
         try:
-            response = requests.get("https://mempool.space/testnet4/api/blocks/tip/hash", timeout=timeout)
+            response = requests.get(f"{HTTP_SERVER_URL}/?type=last", timeout=timeout)
             if response.status_code == 200:
                 LATEST = response.text
                 if True:
