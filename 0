@@ -147,12 +147,12 @@ def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
 def worker(prefixes: List[tuple], data: List[int]):
     # print( "[worker] Core Share: ", s(prefixes), (data) )
     valid = []
-    MAX = 100
-    Attemps = 0
+    # MAX = 100
+    # Attemps = 0
     for prefix in prefixes:
         rest = [x for x in data if x not in prefix]
-        if Attemps >= MAX:
-            break
+        # if Attemps >= MAX:
+            # break
         for p in itertools.permutations(rest):
             mnemonic = " ".join( prefix + p ).strip()
             # print(mnemonic)
@@ -161,8 +161,8 @@ def worker(prefixes: List[tuple], data: List[int]):
                 valid.append(mnemonic)
                 # search( make(mnemonic), mnemonic 
             
-            if Attemps >= MAX:
-                break
+            # if Attemps >= MAX:
+                # break
     return valid
 
 
