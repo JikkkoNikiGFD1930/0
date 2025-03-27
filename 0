@@ -3,6 +3,7 @@ import itertools
 import random
 from mnemonic import Mnemonic
 import hashlib
+from Crypto.Hash import RIPEMD160
 from bip32utils import BIP32Key
 import bech32
 import mmap
@@ -37,6 +38,12 @@ if not os.path.exists(F):
     print("🏁 File Not Downloaded! 🔴")
     exit()
 
+def format_seconds(seconds):
+    seconds = round(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    sec = seconds % 60
+    return f"{hours}h:{minutes}m:{sec}s"
 def wordsINorder( mnemo ):
     indexed_words = []
     for word in mnemo:
@@ -65,6 +72,9 @@ def make(words):
     public_key = bip32_child_key.PublicKey()
     sha256_hash = hashlib.sha256(public_key).digest()
     ripemd160_hash = hashlib.new('ripemd160', sha256_hash).digest()
+    r160 = RIPEMD160.new()
+    r160.update(sha256_hash)
+    ripemd160_hash = r160.digest()
     segwit_address = encode_segwit_address(ripemd160_hash)
     # print("Mnemonic:", words)
     # print("Public Key (HEX):", public_key.hex())
@@ -78,7 +88,7 @@ def search( address, P ):
     # print(f"{result} Elapsed time: {elapsed_time:.6f} seconds")
     if(result):
         print(f"✅ Found {address}\n{P}")
-        notify(f"✅ Found {address}\n{P}")
+        notify(f"✅ Found {address}\n{2**2}")
         return result
     # else:
         # print("🔴 NotFound")
@@ -95,13 +105,47 @@ def search_in_memory(search_term):
         return True
     return False
 
-def notify(msg, type="success", retries=5, delay=2):
+# def notify(msg, type="success", retries=5, delay=2):
+#     for attempt in range(retries):
+#         try:
+#             if type == 'success':
+#                 requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+#             else:
+#                 requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+#             return True
+#         except Exception as e:
+#             print(f"⚠️ Telegram Connection failed [notify_{type}] (Attempt {attempt + 1}/{retries}): {e}")
+#             if attempt < retries - 1:
+#                 time.sleep(delay)
+#             else:
+#                 print(f"❌ Telegram Max retries reached. [notify_{type}]")
+#                 print("Message was:")
+#                 print(msg)
+#                 return None
+
+
+import requests
+import time
+
+def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
     for attempt in range(retries):
         try:
-            if type == 'success':
-                requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+            if message_id:
+                # Edit an existing message if message_id is passed
+                response = requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/editMessageText",
+                                        data={"chat_id": "567639577", "message_id": message_id, "text": msg, "parse_mode": "Markdown"})
             else:
-                requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
+                # Send a new message if message_id is not passed
+                response = requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage",
+                                        data={"chat_id": "567639577", "text": msg, "parse_mode": "Markdown"}) 
+            response_data = response.json()
+            if response.status_code == 200 and "result" in response_data:
+                if not message_id:
+                    return response_data["result"]["message_id"] 
+                return True
+            else:
+                print( "🔴 Telegram Error: ", response_data )
+            time.sleep(delay)
         except Exception as e:
             print(f"⚠️ Telegram Connection failed [notify_{type}] (Attempt {attempt + 1}/{retries}): {e}")
             if attempt < retries - 1:
@@ -111,6 +155,7 @@ def notify(msg, type="success", retries=5, delay=2):
                 print("Message was:")
                 print(msg)
                 return None
+
 
 def worker(prefixes: List[tuple], data: List[int]):
     # print( "[worker] Core Share: ", s(prefixes), (data) )
@@ -154,7 +199,7 @@ def split_data_evenly(data, num_chunks):
 def start():
     selected_words = random.sample(M.wordlist, 12)
     WIO = wordsINorder( selected_words )
-    # notify(f"🏁 Using {cpu_count} CPU CORES\n{WIO}")
+    message_id = notify(f"🕔 Start ...\n🏁 Using *{cpu_count}* CPU CORES\nWords: ``` {' '.join(selected_words)}```")
     data = selected_words
     prefix_pairs = list(itertools.permutations(data, 2))
 
@@ -185,9 +230,8 @@ def start():
     else:
         output = f"✅ {(all_perms):,} Generated in {end_time - start_time:.2f} seconds"
         print(output)
-
-    #Edit that message, instead of making another [CHATGPT]
-    # notify(f"🏁 Using {cpu_count} CPU CORES\n{WIO}\n{output}")
+        
+    notify(f"🏁 *Cores*: ⚡️*x{cpu_count}*\n⚠️ *Words*: ``` { (' '.join(selected_words)) }```\n🟢 *Valid:* ```{len(valid_seeds):,}```\n🎁 *All:* ```{all_perms:,}```\n💯 *Percentage:* ```{round( len(valid_seeds)/all_perms * 100 )}```\n🕔 *Time:* ```{format_seconds(end_time - start_time)}```", message_id)
 
 if __name__ == '__main__':
     print(f"🏁 Using {cpu_count} CPU CORES")
