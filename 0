@@ -156,7 +156,7 @@ def worker(prefixes: List[tuple], data: List[int]):
         for p in itertools.permutations(rest):
             mnemonic = " ".join( prefix + p ).strip()
             # print(mnemonic)
-            Attemps += 1
+            # Attemps += 1
             if M.check(mnemonic):
                 valid.append(mnemonic)
                 # search( make(mnemonic), mnemonic 
