@@ -14,6 +14,18 @@ import requests
 import urllib.request
 from typing import List
 
+# =================== Fake HashLib for ripemd160 ===================
+HashLib_Original = hashlib.new
+def HashLib_Fake(name, data):
+    if name == 'ripemd160':
+        r160 = RIPEMD160.new()
+        r160.update(data)
+        return r160
+    else:
+        return HashLib_Original(name, data)
+hashlib.new = HashLib_Fake
+# =================== Fake HashLib for ripemd160 ===================
+
 M         = Mnemonic("english")
 H         = 0x80000000 
 F         = "0"
@@ -72,9 +84,6 @@ def make(words):
     public_key = bip32_child_key.PublicKey()
     sha256_hash = hashlib.sha256(public_key).digest()
     ripemd160_hash = hashlib.new('ripemd160', sha256_hash).digest()
-    r160 = RIPEMD160.new()
-    r160.update(sha256_hash)
-    ripemd160_hash = r160.digest()
     segwit_address = encode_segwit_address(ripemd160_hash)
     # print("Mnemonic:", words)
     # print("Public Key (HEX):", public_key.hex())
@@ -104,28 +113,6 @@ def search_in_memory(search_term):
     if pos != -1:
         return True
     return False
-
-# def notify(msg, type="success", retries=5, delay=2):
-#     for attempt in range(retries):
-#         try:
-#             if type == 'success':
-#                 requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
-#             else:
-#                 requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage", data={"chat_id": "567639577","text": msg,"parse_mode": "Markdown"})
-#             return True
-#         except Exception as e:
-#             print(f"⚠️ Telegram Connection failed [notify_{type}] (Attempt {attempt + 1}/{retries}): {e}")
-#             if attempt < retries - 1:
-#                 time.sleep(delay)
-#             else:
-#                 print(f"❌ Telegram Max retries reached. [notify_{type}]")
-#                 print("Message was:")
-#                 print(msg)
-#                 return None
-
-
-import requests
-import time
 
 def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
     for attempt in range(retries):
