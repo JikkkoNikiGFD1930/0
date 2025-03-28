@@ -148,7 +148,7 @@ def worker(prefixes: List[tuple], data: List[int]):
     # if using SQLITE3, will speed up? [must be tested, gpt says NO!]
     # print( "[worker] Core Share: ", s(prefixes), (data) )
     valid = []
-    MAX = 5000
+    MAX = 50000
     Attemps = 0
     for prefix in prefixes:
         rest = [x for x in data if x not in prefix]
