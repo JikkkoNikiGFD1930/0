@@ -243,8 +243,8 @@ if __name__ == '__main__':
     start_time = time.time()
     print("🔄 Initializing.... Please wait... 🙏")
     check_file_downloaded()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
-    store_records_from_file(F)
+    # cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
+    # store_records_from_file(F)
     print(f"✅ Records Added in: { time.time() - start_time } seconds")
     # ========== Adding Records ==========
     
