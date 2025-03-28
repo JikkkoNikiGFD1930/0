@@ -147,22 +147,22 @@ def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
 def worker(prefixes: List[tuple], data: List[int]):
     # print( "[worker] Core Share: ", s(prefixes), (data) )
     valid = []
-    # MAX = 100
-    # Attemps = 0
+    MAX = 100
+    Attemps = 0
     for prefix in prefixes:
         rest = [x for x in data if x not in prefix]
-        # if Attemps >= MAX:
-            # break
+        if Attemps >= MAX:
+            break
         for p in itertools.permutations(rest):
             mnemonic = " ".join( prefix + p ).strip()
             # print(mnemonic)
-            # Attemps += 1
+            Attemps += 1
             if M.check(mnemonic):
                 valid.append(mnemonic)
                 # search( make(mnemonic), mnemonic 
             
-            # if Attemps >= MAX:
-                # break
+            if Attemps >= MAX:
+                break
     return valid
 
 
@@ -170,7 +170,8 @@ def search_worker( words ):
     for m in words:
         start_time = time.time()
         search( make(m), m )
-        print(f"search took { format_seconds((time.time()) - start_time) }")
+        end_time = time.time()
+        print(f"search took {end_time - start_time:.5f}")
 def split_data_evenly(data, num_chunks):
     avg_size = len(data) // num_chunks
     remainder = len(data) % num_chunks
