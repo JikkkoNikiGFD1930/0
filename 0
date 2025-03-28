@@ -58,7 +58,7 @@ def check_file_downloaded():
         print(f"✅ Download complete. File Size: {file_size}")
     if not os.path.exists(F):
         print("🏁 File Not Downloaded! 🔴\nProgram Died!\n❌❌❌❌❌")
-        exit()
+        exit(0)
 def format_seconds(seconds):
     seconds = round(seconds)
     hours = seconds // 3600
@@ -231,6 +231,7 @@ if __name__ == '__main__':
     # ========== Adding Records ==========
     start_time = time.time()
     print("🔄 Initializing.... Please wait... 🙏")
+    check_file_downloaded()
     cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
     store_records_from_file(F)
     print(f"✅ Records Added in: { time.time() - start_time } seconds")
