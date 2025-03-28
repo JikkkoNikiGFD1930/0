@@ -6,13 +6,14 @@ import hashlib
 from Crypto.Hash import RIPEMD160
 from bip32utils import BIP32Key
 import bech32
-import mmap
 import time
 import math
 import multiprocessing
 import requests
 import urllib.request
 from typing import List
+import sqlite3
+
 
 # =================== Fake HashLib for ripemd160 ===================
 HashLib_Original = hashlib.new
@@ -30,26 +31,34 @@ M         = Mnemonic("english")
 H         = 0x80000000 
 F         = "0"
 cpu_count = multiprocessing.cpu_count()
+FILE      = f"https://github.com/JikkkoNikiGFD1930/0/releases/download/v0/{F}"
+conn      = sqlite3.connect('Records.db')
+cursor    = conn.cursor()
 
-
-file_url = f"https://github.com/JikkkoNikiGFD1930/0/releases/download/v0/{F}"
-
+def store_records_from_file(file_path):
+    with open(file_path, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if line:
+                cursor.execute('INSERT OR IGNORE INTO records (record) VALUES (?)', (line,))
+    conn.commit()
+def exists(record):
+    cursor.execute('SELECT 1 FROM records WHERE record = ? LIMIT 1', (record,))
+    return cursor.fetchone() is not None
 def format_size(bytes_size):
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if bytes_size < 1024:
             return f"{bytes_size:.2f} {unit}"
         bytes_size /= 1024
-
-if not os.path.exists(F):
-    print("🔴 File not found. Downloading...")
-    urllib.request.urlretrieve(file_url, F)
-    file_size = format_size(os.path.getsize(F))
-    print(f"✅ Download complete. File Size: {file_size}")
-    
-if not os.path.exists(F):
-    print("🏁 File Not Downloaded! 🔴")
-    exit()
-
+def check_file_downloaded():
+    if not os.path.exists(F):
+        print("🔴 File not found. Downloading...")
+        urllib.request.urlretrieve(FILE, F)
+        file_size = format_size(os.path.getsize(F))
+        print(f"✅ Download complete. File Size: {file_size}")
+    if not os.path.exists(F):
+        print("🏁 File Not Downloaded! 🔴\nProgram Died!\n❌❌❌❌❌")
+        exit()
 def format_seconds(seconds):
     seconds = round(seconds)
     hours = seconds // 3600
@@ -74,6 +83,7 @@ def encode_segwit_address(pubkey_hash):
     witprog = bech32.convertbits(pubkey_hash, 8, 5)
     return bech32.bech32_encode("bc", [witness_version] + witprog)
 def make(words):
+    # start_time   = time.time()
     seed = M.to_seed(words)
     bip32_root_key = BIP32Key.fromEntropy(seed)
     bip32_child_key = bip32_root_key.ChildKey(84 + H) \
@@ -88,32 +98,22 @@ def make(words):
     # print("Mnemonic:", words)
     # print("Public Key (HEX):", public_key.hex())
     # print("Bitcoin Address:", segwit_address)
+    # elapsed_time = time.time() - start_time
+    # print(f"🟡  make wallet Elapsed time: {elapsed_time:.6f} seconds")
     return segwit_address
 def search( address, P ):
     # print( address )
     # start_time   = time.time()
-    result       = search_in_memory(f"{ address[3:15] }")
+    result       = exists(f"{ address[3:15] }")
     # elapsed_time = time.time() - start_time
-    # print(f"{result} Elapsed time: {elapsed_time:.6f} seconds")
+    # print(f"❌ { address[3:15] } search_in_memory Elapsed time: {elapsed_time:.6f} seconds")
     if(result):
         print(f"✅ Found {address}\n{P}")
-        notify(f"✅ Found {address}\n{2**2}")
+        notify(f"✅ Found {address}\n{P}")
         return result
     # else:
         # print("🔴 NotFound")
     return False
-    
-def load_file_into_memory(file_path):
-    with open(file_path, 'r+b') as f:
-        return mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-mmap_obj = load_file_into_memory(F)
-def search_in_memory(search_term):
-    search_bytes = search_term.encode('utf-8')
-    pos = mmap_obj.find(search_bytes)
-    if pos != -1:
-        return True
-    return False
-
 def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
     for attempt in range(retries):
         try:
@@ -148,31 +148,31 @@ def worker(prefixes: List[tuple], data: List[int]):
     # if using SQLITE3, will speed up? [must be tested, gpt says NO!]
     # print( "[worker] Core Share: ", s(prefixes), (data) )
     valid = []
-    # MAX = 100
-    # Attemps = 0
+    MAX = 100
+    Attemps = 0
     for prefix in prefixes:
         rest = [x for x in data if x not in prefix]
-        # if Attemps >= MAX:
-            # break
+        if Attemps >= MAX:
+            break
         for p in itertools.permutations(rest):
             mnemonic = " ".join( prefix + p ).strip()
             # print(mnemonic)
-            # Attemps += 1
+            Attemps += 1
             if M.check(mnemonic):
                 valid.append(mnemonic)
                 # search( make(mnemonic), mnemonic 
             
-            # if Attemps >= MAX:
-                # break
+            if Attemps >= MAX:
+                break
     return valid
 
 
 def search_worker( words ):
     for m in words:
-        start_time = time.time()
+        # start_time = time.time()
         search( make(m), m )
-        end_time = time.time()
-        print(f"search took {end_time - start_time:.5f}")
+        # end_time = time.time()
+        # print(f"search[make+sqlite] took {end_time - start_time:.6f}")
 def split_data_evenly(data, num_chunks):
     avg_size = len(data) // num_chunks
     remainder = len(data) % num_chunks
@@ -228,7 +228,14 @@ def start():
     notify(f"🏁 *Cores*: ⚡️*x{cpu_count}*\n⚠️ *Words*: ``` { (' '.join(selected_words)) }```\n🟢 *Valid:* ```{len(valid_seeds):,}```\n🎁 *All:* ```{all_perms:,}```\n💯 *Percentage:* ```{round( len(valid_seeds)/all_perms * 100 )}```\n🕔 *Time:* ```{format_seconds(end_time - start_time)}```", message_id)
 
 if __name__ == '__main__':
+    # ========== Adding Records ==========
+    start_time = time.time()
+    print("🔄 Initializing.... Please wait... 🙏")
+    cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
+    store_records_from_file(F)
+    print(f"✅ Records Added in: { time.time() - start_time } seconds")
+    # ========== Adding Records ==========
+    
     print(f"🏁 Using {cpu_count} CPU CORES")
     start()
-    mmap_obj.close()
     print("🏁 Done")
