@@ -27,7 +27,7 @@ def HashLib_Fake(name, data):
 hashlib.new = HashLib_Fake
 # =================== Fake HashLib for ripemd160 ===================
 # MAX     = 100_000 #per core
-MAX       = 10_000  #per core
+MAX       = 100  #per core
 M         = Mnemonic("english")
 H         = 0x80000000 
 F         = "0"
