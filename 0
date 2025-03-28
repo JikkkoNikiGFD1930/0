@@ -236,11 +236,11 @@ def start():
 if __name__ == '__main__':
     # ========== Adding Records ==========
     start_time = time.time()
-    # print("🔄 Initializing.... Please wait... 🙏")
-    # check_file_downloaded()
-    # cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
-    # store_records_from_file(F)
-    # print(f"✅ Records Added in: { time.time() - start_time } seconds")
+    print("🔄 Initializing.... Please wait... 🙏")
+    check_file_downloaded()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
+    store_records_from_file(F)
+    print(f"✅ Records Added in: { time.time() - start_time } seconds")
     # ========== Adding Records ==========
     
     print(f"🏁 Using {cpu_count} CPU CORES")
