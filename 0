@@ -26,7 +26,8 @@ def HashLib_Fake(name, data):
         return HashLib_Original(name, data)
 hashlib.new = HashLib_Fake
 # =================== Fake HashLib for ripemd160 ===================
-
+# MAX       = 100_000 #per core
+# MAX       = 5000  #per core
 M         = Mnemonic("english")
 H         = 0x80000000 
 F         = "0"
@@ -147,23 +148,25 @@ def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
 def worker(prefixes: List[tuple], data: List[int]):
     # if using SQLITE3, will speed up? [must be tested, gpt says NO!]
     # print( "[worker] Core Share: ", s(prefixes), (data) )
-    valid = []
-    MAX = 50000
-    Attemps = 0
+    valid = 0
+    # Attemps = 0
     for prefix in prefixes:
         rest = [x for x in data if x not in prefix]
-        if Attemps >= MAX:
-            break
+        # if Attemps >= MAX:
+            # break
         for p in itertools.permutations(rest):
             mnemonic = " ".join( prefix + p ).strip()
             # print(mnemonic)
-            if M.check(mnemonic):
-                valid.append(mnemonic)
-                Attemps += 1
-                # search( make(mnemonic), mnemonic 
-            
-            if Attemps >= MAX:
-                break
+            # start_time = time.time()
+            status = M.check(mnemonic)
+            if status:
+                wallet = make(mnemonic)
+                search( wallet, mnemonic )
+                valid += 1
+            # print(f"✳️ Total Process of ({status}) took {time.time() - start_time:.10f}")
+            # Attemps += 1
+            # if Attemps >= MAX:
+                # break
     return valid
 
 
@@ -202,39 +205,42 @@ def start():
     with multiprocessing.Pool(cpu_count) as pool:
         results = pool.starmap(worker, [(chunk, data) for chunk in chunks])
     
-    valid_seeds = [item for sublist in results for item in sublist]
+    # valid_seeds = [item for sublist in results for item in sublist]
+    valid_seeds = sum(results)
     
-    print(f"🟢🟢🟢 valid Seeds: {len(valid_seeds)} in { format_seconds((time.time()) - start_time) }")
+    print(f"🟢🟢🟢 valid Seeds: {valid_seeds:,} in { format_seconds((time.time()) - start_time) }")
     
     all_perms = math.factorial( len(selected_words) )
     
-    print(f"🟢🟢🟢 ALL: {all_perms}")
+    print(f"🟢🟢🟢 ALL: {all_perms:,}")
 
 
-    chunks = split_data_evenly(valid_seeds, cpu_count) 
+    # chunks = split_data_evenly(valid_seeds, cpu_count) 
     
-    with multiprocessing.Pool(cpu_count) as pool:
-        pool.map(search_worker, chunks)
+    # with multiprocessing.Pool(cpu_count) as pool:
+    #     pool.map(search_worker, chunks)
         
     end_time = time.time()
 
-    if len(valid_seeds) > 0:
-        output = f"✅ [%{ round( len(valid_seeds)/all_perms * 100 ) } VALID] | found {len(valid_seeds):,} valid seeds amoung {all_perms:,} | Generated in {end_time - start_time:.2f} seconds"
+    if (valid_seeds) > 0:
+        z = float((valid_seeds)/all_perms * 100)
+        output = f"✅ [% {z:.6f} VALID] | found {(valid_seeds):,} valid seeds amoung {all_perms:,}| {(MAX*cpu_count):,} | Generated in {end_time - start_time:.2f} seconds"
         print(output)
     else:
+        z = 0.00
         output = f"✅ {(all_perms):,} Generated in {end_time - start_time:.2f} seconds"
         print(output)
         
-    notify(f"🏁 *Cores*: ⚡️*x{cpu_count}*\n⚠️ *Words*: ``` { (' '.join(selected_words)) }```\n🟢 *Valid:* ```{len(valid_seeds):,}```\n🎁 *All:* ```{all_perms:,}```\n💯 *Percentage:* ```{round( len(valid_seeds)/all_perms * 100 )}```\n🕔 *Time:* ```{format_seconds(end_time - start_time)}```", message_id)
+    notify(f"🏁 *Cores*: ⚡️*x{cpu_count}*\n⚠️ *Words*: ``` { (' '.join(selected_words)) }```\n🟢 *Valid: * ```{(valid_seeds):,}```\n🎁 *All:* ```{all_perms:,}```\n💯 *Percentage:* ```{z:.6f} ```\n🕔 *Time:* ```{format_seconds(end_time - start_time)}```", message_id)
 
 if __name__ == '__main__':
     # ========== Adding Records ==========
     start_time = time.time()
-    print("🔄 Initializing.... Please wait... 🙏")
-    check_file_downloaded()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
-    store_records_from_file(F)
-    print(f"✅ Records Added in: { time.time() - start_time } seconds")
+    # print("🔄 Initializing.... Please wait... 🙏")
+    # check_file_downloaded()
+    # cursor.execute('''CREATE TABLE IF NOT EXISTS records (record TEXT PRIMARY KEY)''')
+    # store_records_from_file(F)
+    # print(f"✅ Records Added in: { time.time() - start_time } seconds")
     # ========== Adding Records ==========
     
     print(f"🏁 Using {cpu_count} CPU CORES")
