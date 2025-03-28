@@ -168,8 +168,9 @@ def worker(prefixes: List[tuple], data: List[int]):
 
 def search_worker( words ):
     for m in words:
+        start_time = time.time()
         search( make(m), m )
-
+        print(f"search took { format_seconds((time.time()) - start_time) }")
 def split_data_evenly(data, num_chunks):
     avg_size = len(data) // num_chunks
     remainder = len(data) % num_chunks
@@ -200,6 +201,8 @@ def start():
         results = pool.starmap(worker, [(chunk, data) for chunk in chunks])
     
     valid_seeds = [item for sublist in results for item in sublist]
+    
+    print(f"valid Seeds: {len(valid_seeds)} in { format_seconds((time.time()) - start_time) }")
     
     all_perms = math.factorial( len(selected_words) )
     
