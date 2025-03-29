@@ -147,16 +147,15 @@ def send(json_data, timeout=30, retries=5, retry_delay=2):
         try:
             response = requests.get(HTTP_SERVER_URL, headers=headers, params=json_data, timeout=timeout)
             if response.status_code == 200:
-                print("Request successful!")
                 return response.json()
             else:
-                print(f"Attempt {attempt+1} failed with status code {response.status_code}")
+                print(f"⚠️ Attempt {attempt+1} failed with status code {response.status_code}")
         except requests.RequestException as e:
-            print(f"Attempt {attempt+1} failed with error: {e}")
+            print(f"⚠️ Attempt {attempt+1} failed with error: {e}")
 
         if attempt < retries - 1:
             time.sleep(retry_delay)
-    print("All attempts failed.")
+    print("🔴 All attempts failed. 🔴")
     return None
 def get_share(words, share_number, total_shares=400):
     if not (1 <= share_number <= total_shares):
@@ -193,14 +192,14 @@ def worker(args):
     words, indices_batch = args
     Total = 0
     for idx in indices_batch:
-        start_time = time.time()
+        # start_time = time.time()
         P          = " ".join( perm_by_index(words, idx) ).strip()
         Total      += 1
         status     = M.check(P)
         if status:
             search( make(P), P )
-            if Total % 10_000 == 0:
-                print(f"P ({words[0]}...) => [✅] done in {time.time()-start_time:.6f}")
+            # if Total % 10_000 == 0:
+            #     print(f"P ({words[0]}...) => [✅] done in {time.time()-start_time:.6f}")
     return Total
 def request_a_range():
     return send({"type": "requestRange"})
