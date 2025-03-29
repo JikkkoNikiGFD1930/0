@@ -207,6 +207,7 @@ def request_a_range():
 def make_range_done(range_id):
     return send({"type": "completeRange", "id": range_id})
 def work():
+    global _range
     if len(_range) == 0:
         _range    = request_a_range()
     range_id = _range['id']
