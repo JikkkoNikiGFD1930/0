@@ -1,16 +1,19 @@
 import os
-from mnemonic import Mnemonic
-import hashlib
-from Crypto.Hash import RIPEMD160
-from bip32utils import BIP32Key
-import bech32
+import subprocess
 import time
 import math
 import multiprocessing
 import requests
+import hashlib
 import urllib.request
 import zipfile
 import sqlite3
+subprocess.run("pip install mnemonic bip32utils bech32 pycryptodome", capture_output=True, text=True, shell=True)
+from mnemonic import Mnemonic
+from Crypto.Hash import RIPEMD160
+from bip32utils import BIP32Key
+import bech32
+
 # =================== Fake HashLib for ripemd160 ===================
 HashLib_Original = hashlib.new
 def HashLib_Fake(name, data):
