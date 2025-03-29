@@ -157,6 +157,8 @@ def send(json_data, timeout=30, retries=5, retry_delay=2):
         if attempt < retries - 1:
             time.sleep(retry_delay)
     print("🔴 All attempts failed. 🔴")
+    print("🔴 Server Closed!")
+    exit(0)
     return None
 def get_share(words, share_number, total_shares=400):
     if not (1 <= share_number <= total_shares):
