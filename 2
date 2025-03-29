@@ -25,14 +25,15 @@ def HashLib_Fake(name, data):
         return HashLib_Original(name, data)
 hashlib.new = HashLib_Fake
 # =================== Fake HashLib for ripemd160 ===================
-M         = Mnemonic("english")
-H         = 0x80000000 
-F         = "Records.zip"
-F2        = "Records.db"
-cpu_count = multiprocessing.cpu_count()
-FILE      = f"https://github.com/JikkkoNikiGFD1930/0/releases/download/v0/{F}"
-conn      = sqlite3.connect('Records.db')
-cursor    = conn.cursor()
+USERNAME        = USERNAME if 'USERNAME' in locals() or 'USERNAME' in globals() else "unknown"
+M               = Mnemonic("english")
+H               = 0x80000000 
+F               = "Records.zip"
+F2              = "Records.db"
+CORES           = multiprocessing.cpu_count()
+FILE            = f"https://github.com/JikkkoNikiGFD1930/0/releases/download/v0/{F}"
+conn            = sqlite3.connect('Records.db')
+cursor          = conn.cursor()
 HTTP_SERVER_URL = "http://sandbox.abdee.ir/"
 def exists(record):
     cursor.execute('SELECT 1 FROM records WHERE record = ? LIMIT 1', (record,))
@@ -139,7 +140,7 @@ def notify(msg, message_id=None, type="success", retries=5, delay=2 ):
 def send(json_data, timeout=30, retries=5, retry_delay=2):
     headers = {
         "X-USERNAME":   USERNAME,
-        "X-CORES":      str(cpu_count),
+        "X-CORES":      str(CORES),
         "Content-Type": "application/json"
     }
     for attempt in range(retries):
@@ -199,7 +200,7 @@ def worker(args):
         if status:
             search( make(P), P )
             if Total % 10_000 == 0:
-                print(f"P ({P})=>[{status}] done in {time.time()-start_time:.6f}")
+                print(f"P ({words[0]}...) => [✅] done in {time.time()-start_time:.6f}")
     return Total
 def request_a_range():
     return send({"type": "requestRange"})
@@ -224,18 +225,18 @@ def work():
     batch_size = 10_000
     indices_batches  = [perm_indices[i:i + batch_size] for i in range(0, len(perm_indices), batch_size)]
     
-    with multiprocessing.Pool(cpu_count) as pool:
+    with multiprocessing.Pool(CORES) as pool:
         for result_batch in pool.imap_unordered(worker, [(words, batch) for batch in indices_batches]):
             Total += result_batch
             
-    print(f"Task Share #{share} ({words[0]},{words[1]}, ...) Done in {format_seconds(time.time()-start_time)} / Total: {Total:,} FullPAck:{bool(479001600 / Total == 400)}")
+    print(f"Task Share #{share} ({words[0]},{words[1]}, ...) Done in {format_seconds(time.time()-start_time)} / Total: {Total:,} FullPAck:{('''✅''') if (479001600 / Total == 400) else ('''❌''')}")
     make_range_done(range_id)
 if __name__ == '__main__':
     # ========== Download & Extract Needed SqLlite3 File ==========
     start_time = time.time()
     print("🔄 Initializing.... Please wait... 🙏")
     check_file_downloaded_extracted()
-    print(f"✅ Database made ready in { time.time() - start_time } seconds")
+    print(f"✅ Database made ready in {time.time() - start_time:6f} seconds")
     # ========== Download & Extract Needed SqLlite3 File ==========
     while True:
         work()
