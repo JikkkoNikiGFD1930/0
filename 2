@@ -228,7 +228,7 @@ def work():
         for result_batch in pool.imap_unordered(worker, [(words, batch) for batch in indices_batches]):
             Total += result_batch
             
-    print(f"Task Share #{share} ({words[0]},{words[1]}, ...) Done in {format_seconds(time.time()-start_time)} / Total: {Total:,} FullPAck:{('''✅''') if (479001600 / Total == 400) else ('''❌''')}")
+    print(f"✅ Task Share #{share} ({words[0]},{words[1]}, ...) Done in {format_seconds(time.time()-start_time)} / {Total:,} (FullPAck: {('''✅''') if (479001600 / Total == 400) else ('''❌''')})")
     make_range_done(range_id)
 if __name__ == '__main__':
     # ========== Download & Extract Needed SqLlite3 File ==========
