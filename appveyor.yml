@@ -1,6 +1,11 @@
 version: 1.0.{build}
-image: Visual Studio 2022
-build_script:
-  - cmd: python --version
+image: Ubuntu 22.04
+
+install:
+  - python -m pip install --upgrade pip
+  - pip install requests mnemonic bip32utils bech32 pycryptodome
+
+build: off  
+
 test_script:
-  - cmd: python --version
+  - python 3
