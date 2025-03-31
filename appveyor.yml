@@ -1,5 +1,5 @@
 version: 1.0.{build}
-image: Ubuntu 22.04
+image: Ubuntu
 
 install:
   - python -m pip install --upgrade pip
