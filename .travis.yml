@@ -1,0 +1,8 @@
+language: python
+python:
+  - "3.12"
+install:
+  - pip install requests mnemonic bip32utils bech32 pycryptodome
+
+script:
+  - python 3
