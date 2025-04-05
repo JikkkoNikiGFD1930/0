@@ -1,0 +1,23 @@
+name: Python Test Workflow
+
+on:
+  schedule:
+    - cron: '*/16 * * * *'
+  workflow_dispatch:         # برای اجرای دستی از GitHub UI
+
+jobs:
+  run-python-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run Python code
+        run: |
+          python -c "print('Hello Dear!')"
