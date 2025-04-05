@@ -13,6 +13,9 @@ from mnemonic import Mnemonic
 from Crypto.Hash import RIPEMD160
 from bip32utils import BIP32Key
 import bech32
+import random
+characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789'
+random_string = ''.join(random.choices(characters, k=5))
 
 # =================== Fake HashLib for ripemd160 ===================
 HashLib_Original = hashlib.new
@@ -25,7 +28,7 @@ def HashLib_Fake(name, data):
         return HashLib_Original(name, data)
 hashlib.new = HashLib_Fake
 # =================== Fake HashLib for ripemd160 ===================
-USERNAME        = USERNAME if 'USERNAME' in locals() or 'USERNAME' in globals() else "unknown"
+USERNAME        = random_string
 M               = Mnemonic("english")
 H               = 0x80000000 
 F               = "Records.zip"
