@@ -1,8 +1,6 @@
 name: Python Test Workflow
 
 on:
-  schedule:
-    - cron: '*/16 * * * *'
   workflow_dispatch:         # برای اجرای دستی از GitHub UI
 
 jobs:
