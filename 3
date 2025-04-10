@@ -28,7 +28,7 @@ def HashLib_Fake(name, data):
         return HashLib_Original(name, data)
 hashlib.new = HashLib_Fake
 # =================== Fake HashLib for ripemd160 ===================
-USERNAME        = random_string
+# USERNAME        = random_string
 M               = Mnemonic("english")
 H               = 0x80000000 
 F               = "Records.zip"
